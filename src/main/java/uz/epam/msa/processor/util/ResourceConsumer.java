@@ -42,13 +42,13 @@ public class ResourceConsumer {
     }
 
     public byte[] getResourceObject(String resourceID) {
-        ResponseEntity<byte[]> response = MicroserviceUtil.getInstanceRestTemplate().getForEntity(Constants.RESOURCES_SERVICE_URL + resourceID, byte[].class);
+        ResponseEntity<byte[]> response = MicroserviceUtil.getInstanceRestTemplate().getForEntity(Constants.API_GATEWAY_RESOURCES_SERVICE_URL + resourceID, byte[].class);
         log.info(String.format("Response status -> %s", response.getStatusCodeValue()));
         return response.getBody();
     }
 
     public void postSongMetadata(SongDTO dto) {
-        ResponseEntity<ResourceDTO> response = MicroserviceUtil.getInstanceRestTemplate().postForEntity(Constants.SONG_SERVICE_URL, dto, ResourceDTO.class);
+        ResponseEntity<ResourceDTO> response = MicroserviceUtil.getInstanceRestTemplate().postForEntity(Constants.API_GATEWAY_SONG_SERVICE_URL, dto, ResourceDTO.class);
         log.info(String.format("Response status -> %s", response.getStatusCodeValue()));
     }
 
