@@ -6,6 +6,7 @@ import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.ParseContext;
 import org.apache.tika.parser.Parser;
 import org.apache.tika.parser.mp3.Mp3Parser;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.retry.annotation.Backoff;
@@ -29,6 +30,12 @@ import java.time.format.DateTimeFormatter;
 @Slf4j
 public class ResourceConsumer {
 
+    @Value("${api.gateway.resources.endpoint.url}")
+    private String API_GATEWAY_RESOURCES_SERVICE_URL;
+    @Value("${api.gateway.songs.endpoint.url}")
+    private String API_GATEWAY_SONG_SERVICE_URL;
+
+
     @KafkaListener(topics = "resources-id-topic")
     @Retryable(value = Exception.class,
             maxAttempts = 5,
@@ -42,13 +49,13 @@ public class ResourceConsumer {
     }
 
     public byte[] getResourceObject(String resourceID) {
-        ResponseEntity<byte[]> response = MicroserviceUtil.getInstanceRestTemplate().getForEntity(Constants.API_GATEWAY_RESOURCES_SERVICE_URL + resourceID, byte[].class);
+        ResponseEntity<byte[]> response = MicroserviceUtil.getInstanceRestTemplate().getForEntity(API_GATEWAY_RESOURCES_SERVICE_URL + resourceID, byte[].class);
         log.info(String.format("Response status -> %s", response.getStatusCodeValue()));
         return response.getBody();
     }
 
     public void postSongMetadata(SongDTO dto) {
-        ResponseEntity<ResourceDTO> response = MicroserviceUtil.getInstanceRestTemplate().postForEntity(Constants.API_GATEWAY_SONG_SERVICE_URL, dto, ResourceDTO.class);
+        ResponseEntity<ResourceDTO> response = MicroserviceUtil.getInstanceRestTemplate().postForEntity(API_GATEWAY_SONG_SERVICE_URL, dto, ResourceDTO.class);
         log.info(String.format("Response status -> %s", response.getStatusCodeValue()));
     }
 
