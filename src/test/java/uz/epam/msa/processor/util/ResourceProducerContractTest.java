@@ -19,7 +19,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureStubRunner(
         stubsMode = StubRunnerProperties.StubsMode.LOCAL,
         ids = "uz.epam.msa.song:song-service:+:stubs:1199")
-public class ResourceConsumerContractTest {
+public class ResourceProducerContractTest {
 
     @Autowired
     private MockMvc mockMvc;
