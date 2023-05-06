@@ -16,7 +16,6 @@ import org.springframework.stereotype.Component;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
-import uz.epam.msa.processor.Constants;
 import uz.epam.msa.processor.dto.ResourceDTO;
 import uz.epam.msa.processor.dto.SongDTO;
 
@@ -25,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Objects;
 
 @Component
 @Slf4j
@@ -34,6 +34,15 @@ public class ResourceConsumer {
     private String API_GATEWAY_RESOURCES_SERVICE_URL;
     @Value("${api.gateway.songs.endpoint.url}")
     private String API_GATEWAY_SONG_SERVICE_URL;
+
+    @Value("${app.resource.topic.name}")
+    private String topicName;
+
+    private final Producer producer;
+
+    public ResourceConsumer(Producer producer) {
+        this.producer = producer;
+    }
 
 
     @KafkaListener(topics = "resources-id-topic")
@@ -45,7 +54,7 @@ public class ResourceConsumer {
         byte[] data = getResourceObject(resourceID);
         SongDTO dto = createFile(data, resourceID);
         log.info(String.format(Constants.SONG_DTO_FORMED_MSG, dto));
-        postSongMetadata(dto);
+        producer.sendMessage(String.valueOf(postSongMetadata(dto)));
     }
 
     public byte[] getResourceObject(String resourceID) {
@@ -54,9 +63,10 @@ public class ResourceConsumer {
         return response.getBody();
     }
 
-    public void postSongMetadata(SongDTO dto) {
+    public int postSongMetadata(SongDTO dto) {
         ResponseEntity<ResourceDTO> response = MicroserviceUtil.getInstanceRestTemplate().postForEntity(API_GATEWAY_SONG_SERVICE_URL, dto, ResourceDTO.class);
         log.info(String.format("Response status -> %s", response.getStatusCodeValue()));
+        return Objects.requireNonNull(response.getBody()).getId();
     }
 
     @Recover

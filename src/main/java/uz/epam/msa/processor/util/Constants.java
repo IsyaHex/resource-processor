@@ -1,4 +1,4 @@
-package uz.epam.msa.processor;
+package uz.epam.msa.processor.util;
 
 public class Constants {
     public static final String SONG_ARTIST = "xmpDM:artist";
