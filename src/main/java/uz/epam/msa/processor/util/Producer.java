@@ -21,7 +21,7 @@ public class Producer {
     }
 
     public void sendMessage(String resourceId) {
-        log.info(String.format(Constants.RECEIVED_RESOURCE_ID, resourceId));
+        log.info(String.format(Constants.SENDING_SONG_DATA, resourceId));
         Message<String> message = MessageBuilder
                 .withPayload(resourceId)
                 .setHeader(KafkaHeaders.TOPIC, topic.name())

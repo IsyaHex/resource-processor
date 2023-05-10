@@ -7,12 +7,16 @@ import org.apache.tika.parser.ParseContext;
 import org.apache.tika.parser.Parser;
 import org.apache.tika.parser.mp3.Mp3Parser;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestTemplate;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
@@ -24,7 +28,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
+
+import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 
 @Component
 @Slf4j
@@ -39,9 +47,10 @@ public class ResourceConsumer {
     private String topicName;
 
     private final Producer producer;
-
-    public ResourceConsumer(Producer producer) {
+    private final RestTemplate restTemplate;
+    public ResourceConsumer(Producer producer, RestTemplate restTemplate) {
         this.producer = producer;
+        this.restTemplate = restTemplate;
     }
 
 
@@ -49,22 +58,32 @@ public class ResourceConsumer {
     @Retryable(value = Exception.class,
             maxAttempts = 5,
             backoff = @Backoff(delay = 5000L))
-    public void consume(String resourceID) {
-        log.info(String.format(Constants.RECEIVED_RESOURCE_ID, resourceID));
-        byte[] data = getResourceObject(resourceID);
-        SongDTO dto = createFile(data, resourceID);
+    public void consume(String data) {
+        log.info(String.format(Constants.RECEIVED_RESOURCE_DATA, data));
+        Map<String, String> resourceData = parseResourceData(data);
+        String token = resourceData.get(Constants.TOKEN);
+        byte[] blob = getResourceObject(resourceData);
+        SongDTO dto = createFile(blob, resourceData.get(Constants.RESOURCE_ID));
         log.info(String.format(Constants.SONG_DTO_FORMED_MSG, dto));
-        producer.sendMessage(String.valueOf(postSongMetadata(dto)));
+        producer.sendMessage(String.valueOf(postSongMetadata(dto, token)));
     }
 
-    public byte[] getResourceObject(String resourceID) {
-        ResponseEntity<byte[]> response = MicroserviceUtil.getInstanceRestTemplate().getForEntity(API_GATEWAY_RESOURCES_SERVICE_URL + resourceID, byte[].class);
+    public byte[] getResourceObject(Map<String, String> resourceData) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.add(AUTHORIZATION, resourceData.get(Constants.TOKEN));
+        HttpEntity<Void> request = new HttpEntity<>(headers);
+
+        ResponseEntity<byte[]> response = restTemplate.exchange(API_GATEWAY_RESOURCES_SERVICE_URL + resourceData.get(Constants.RESOURCE_ID), HttpMethod.GET, request, byte[].class);
         log.info(String.format("Response status -> %s", response.getStatusCodeValue()));
         return response.getBody();
     }
 
-    public int postSongMetadata(SongDTO dto) {
-        ResponseEntity<ResourceDTO> response = MicroserviceUtil.getInstanceRestTemplate().postForEntity(API_GATEWAY_SONG_SERVICE_URL, dto, ResourceDTO.class);
+    public int postSongMetadata(SongDTO dto, String token) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.add(AUTHORIZATION, token);
+        HttpEntity<SongDTO> request = new HttpEntity<>(dto, headers);
+
+        ResponseEntity<ResourceDTO> response = restTemplate.exchange(API_GATEWAY_SONG_SERVICE_URL, HttpMethod.POST, request, ResourceDTO.class);
         log.info(String.format("Response status -> %s", response.getStatusCodeValue()));
         return Objects.requireNonNull(response.getBody()).getId();
     }
@@ -99,6 +118,16 @@ public class ResourceConsumer {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern(Constants.GET_TIME_PATTERN);
         LocalDateTime dateTime = LocalDateTime.now();
         return formatter.format(dateTime);
+    }
+
+    private Map<String, String> parseResourceData(String s) {
+        Map<String, String> data = new HashMap<>();
+        String resourceId = s.substring(2, s.indexOf(','));
+        String token = s.substring(s.indexOf(',') + 1, s.indexOf(']')).strip();
+
+        data.put(Constants.RESOURCE_ID, resourceId);
+        data.put(Constants.TOKEN, token);
+        return data;
     }
 
 }

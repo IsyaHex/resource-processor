@@ -7,9 +7,9 @@ import org.springframework.web.client.RestTemplate;
 @Component
 public class MicroserviceUtil {
 
-
     @Bean
     public static RestTemplate getInstanceRestTemplate() {
         return new RestTemplate();
     }
+
 }
